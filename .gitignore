@@ -5,3 +5,8 @@ __pycache__/
 
 frontend/node_modules/
 .env
+
+
+*.csv
+*.pkl
+*.joblib
