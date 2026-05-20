@@ -1,16 +1,25 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware # <--- NEW
 from pydantic import BaseModel
 import joblib
 import pandas as pd
 
-# 1. Create the FastAPI app
 app = FastAPI()
 
-# 2. Load the AI brain and the list of features it needs
+# --- CORS MIDDLEWARE (NEW) ---
+# This gives our React app permission to talk to our Python server
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"], # React's URL
+    allow_credentials=True,
+    allow_methods=["*"], # Allow all requests (GET, POST, etc.)
+    allow_headers=["*"],
+)
+
+# Load the AI brain
 model = joblib.load('surge_model.joblib')
 model_features = joblib.load('model_features.joblib')
 
-# 3. Define what a "Request" looks like (The Order Form)
 class RideRequest(BaseModel):
     hour: int
     weather: str
@@ -21,11 +30,8 @@ class RideRequest(BaseModel):
 def home():
     return {"message": "Surge Pricing API is Running"}
 
-# 4. The Prediction Endpoint (The main task)
 @app.post("/predict")
 def predict_price(request: RideRequest):
-    # a. Convert the incoming request into a Format the AI understands
-    # Remember: the AI needs those 1s and 0s for Weather
     input_data = {
         'Hour': [request.hour],
         'Distance_Miles': [request.distance],
@@ -34,15 +40,7 @@ def predict_price(request: RideRequest):
         'Weather_Rain': [1 if request.weather == 'Rain' else 0],
         'Weather_Snow': [1 if request.weather == 'Snow' else 0]
     }
-    
-    # b. Convert to a DataFrame
     df_input = pd.DataFrame(input_data)
-    
-    # c. Make sure the columns are in the EXACT same order as when we trained
     df_input = df_input[model_features]
-    
-    # d. Get the prediction from the AI
     prediction = model.predict(df_input)
-    
-    # e. Return the answer as JSON
     return {"predicted_price": round(float(prediction[0]), 2)}
